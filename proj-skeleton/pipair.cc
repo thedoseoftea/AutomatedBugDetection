@@ -96,18 +96,48 @@ void calculatePairSupport(set<long> scope) {
   }
 }
 
-/*void findBugs(CallGraph & graph, SupportPairTable pairTable, SupportTable table) {
-   for(CallGraph::iterator it = graph.begin(); it!=graph.end(); ++it) {
-    
+void printBug(int existing, int scope, pair<long,long> p, int support, double confidence) {
+  cout << "bug: " << toString(existing)
+    <<" in " << toString(scope)
+    << ", pair: " << "(" << toString(p.first) << ", " << toString(p.second) << "), "
+    << "support: " << support <<", "
+    << "confidence: " << confidence << endl;
+    // bug: %s in %s, pair: (%s, %s), support: %d, confidence: %.2f%%\n
+}
+
+void findBug(CallGraph & graph, long existing, long missing, double pairSupport, double bugConfidence, double confidence) {
+  if(bugConfidence > confidence) {
+    for(CallGraph::iterator it  = graph.begin();it!=graph.end();++it) {
+      set<long> scopeMethods = it->second;
+      if (find(scopeMethods.begin(), scopeMethods.end(), existing) != scopeMethods.end() &&
+          find(scopeMethods.begin(), scopeMethods.end(), missing) == scopeMethods.end()) {
+        printBug(existing, it->first, make_pair(existing, missing), pairSupport, bugConfidence);
+      }
+    }
   }
+}
 
-}*/
+void findBugs(CallGraph & graph, int support, int confidence) {
+  for(SupportPairTable::iterator it = supportPairTable.begin(); it!= supportPairTable.end(); ++it) {
+    pair<long, long> p = it->first;
+    int pairSupport = it->second;
+    if (pairSupport >= support) {
+      long first = p.first;
+      long second = p.second;
+      int firstSupport = supportTable[first];
+      int secondSupport = supportTable[second];
+      findBug(graph, first, second, pairSupport, (double)pairSupport/firstSupport, (double)confidence/100);
+      findBug(graph, second, first, pairSupport, (double)pairSupport/secondSupport, (double)confidence/100);
+    }
+  }
+}
 
-void processGraph(CallGraph & graph) {
+void processGraph(CallGraph & graph, int support, int confidence) {
   for(CallGraph::iterator it = graph.begin(); it!=graph.end(); ++it) {
     calculateSupport(it->second); 
     calculatePairSupport(it->second);
   }
+  findBugs(graph, support, confidence); 
 }
 
 int main (int argc, char* argv[]) {
@@ -127,7 +157,6 @@ int main (int argc, char* argv[]) {
     if (tokens.size() == 7) {
       node = tokens[5];
       extractQuotes(node);
-      cout << node << endl;
     } else if (tokens.size() == 4) {
         if(tokens[2] == "external" && tokens[3] == "node") {
           continue;
@@ -140,11 +169,10 @@ int main (int argc, char* argv[]) {
         }
         string leaf = tokens[3];
         extractQuotes(leaf);
-        cout << "\t" << leaf << endl;
         callGraph[toId(node)].insert(toId(leaf));
     }
   }
-  processGraph(callGraph);
+  processGraph(callGraph, support, confidence);
   return 0;
 }
 
