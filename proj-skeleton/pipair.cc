@@ -16,7 +16,7 @@ using namespace std;
 
 typedef map<long, set<long> > CallGraph;
 typedef map<long, int> SupportTable;
-typedef map<set<long,long>, int> SupportPairTable;
+typedef map<pair<long,long>, int> SupportPairTable;
 
 static SupportTable supportTable;
 static SupportPairTable supportPairTable;
@@ -33,13 +33,13 @@ string toString(long id) {
 }
 
 int toId(string s) {
-  static int count = 0;
+  static long count = 0;
   if (id_map.count(s)) {
     return id_map[s];
   }
   id_map[s] = count;
   reverse_id_map[count] = s;
-  count++;
+  return count++;
 }
 
 
@@ -69,11 +69,45 @@ vector<string> split(const string &s, char delim) {
 void extractQuotes(string& s) {
   size_t first = s.find_first_of('\'');
   size_t last = s.find_last_of('\'');
-  s = s.substr(first+1, last-1);
+  s = s.substr(first+1, last-first-1);
 }
 
-void calculateSupport(CallGraph graph) {
-  // calculate support for the call graph
+void calculateSupport(set<long> scope) {
+  for(set<long>::iterator it = scope.begin();it!=scope.end();++it) {
+    supportTable[*it]++;
+  }
+}
+
+void calculatePairSupport(set<long> scope) {
+  for(set<long>::iterator i = scope.begin();i!=scope.end();++i) {
+    long first = *i;
+    for(set<long>::iterator j = i; j!=scope.end();++j) {
+      long second = *j;
+      if (first != second) {
+        pair<long,long> p;
+        if (first < second) {
+          p = make_pair(first, second);
+        } else {
+          p = make_pair(second, first);
+        }
+        supportPairTable[p]++;
+      }
+    }
+  }
+}
+
+/*void findBugs(CallGraph & graph, SupportPairTable pairTable, SupportTable table) {
+   for(CallGraph::iterator it = graph.begin(); it!=graph.end(); ++it) {
+    
+  }
+
+}*/
+
+void processGraph(CallGraph & graph) {
+  for(CallGraph::iterator it = graph.begin(); it!=graph.end(); ++it) {
+    calculateSupport(it->second); 
+    calculatePairSupport(it->second);
+  }
 }
 
 int main (int argc, char* argv[]) {
@@ -110,7 +144,7 @@ int main (int argc, char* argv[]) {
         callGraph[toId(node)].insert(toId(leaf));
     }
   }
-  calculateSupport(callGraph);
+  processGraph(callGraph);
   return 0;
 }
 
