@@ -106,7 +106,7 @@ void printBug(int existing, int scope, pair<long,long> p, int support, double co
 }
 
 void findBug(CallGraph & graph, long existing, long missing, double pairSupport, double bugConfidence, double confidence) {
-  if(bugConfidence > confidence) {
+  if(bugConfidence >= confidence) {
     for(CallGraph::iterator it  = graph.begin();it!=graph.end();++it) {
       set<long> scopeMethods = it->second;
       if (find(scopeMethods.begin(), scopeMethods.end(), existing) != scopeMethods.end() &&
@@ -172,6 +172,7 @@ int main (int argc, char* argv[]) {
         callGraph[toId(node)].insert(toId(leaf));
     }
   }
+  cout << "after parsing" << endl;
   processGraph(callGraph, support, confidence);
   return 0;
 }
