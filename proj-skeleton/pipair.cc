@@ -11,6 +11,7 @@
 #include <map>
 #include <set>
 #include <utility>
+#include <stdio.h>
 
 using namespace std;
 
@@ -97,12 +98,26 @@ void calculatePairSupport(set<long> scope) {
 }
 
 void printBug(int existing, int scope, pair<long,long> p, int support, double confidence) {
-  cout << "bug: " << toString(existing)
+  /*cout << "bug: " << toString(existing)
     <<" in " << toString(scope)
     << ", pair: " << "(" << toString(p.first) << ", " << toString(p.second) << "), "
     << "support: " << support <<", "
-    << "confidence: " << confidence << endl;
-    // bug: %s in %s, pair: (%s, %s), support: %d, confidence: %.2f%%\n
+    << "confidence: " << confidence << endl;*/
+    string first = toString(p.first);
+    string second = toString(p.second);
+    if (first > second) {
+      string temp = first;
+      first = second;
+      second = temp;
+    }
+
+    printf("bug: %s in %s, pair: (%s, %s), support: %d, confidence: %.2f%%\n", 
+        toString(existing).c_str(),
+        toString(scope).c_str(),
+        first.c_str(),
+        second.c_str(),
+        support,
+        confidence);
 }
 
 void findBug(CallGraph & graph, long existing, long missing, double pairSupport, double bugConfidence, double confidence) {
@@ -172,7 +187,6 @@ int main (int argc, char* argv[]) {
         callGraph[toId(node)].insert(toId(leaf));
     }
   }
-  cout << "after parsing" << endl;
   processGraph(callGraph, support, confidence);
   return 0;
 }
