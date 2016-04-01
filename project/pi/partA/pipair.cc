@@ -9,23 +9,27 @@
 #include <iterator>
 #include <vector>
 #include <map>
-#include <stack>
 #include <set>
 #include <utility>
 #include <stdio.h>
 
 using namespace std;
 
-int level=0;
+// map of scope => methods in scope
 typedef map<long, set<long> > CallGraph;
+
+// support for each individual method in the call graph
 typedef map<long, int> SupportTable;
+
+// support for each pair method in the call graph
 typedef map<pair<long,long>, int> SupportPairTable;
 
 static SupportTable supportTable;
 static SupportPairTable supportPairTable;
+
+//  string (function name) <=> integer (id)
 static map<string, long> id_map;
 static map<long, string> reverse_id_map;
-static map<long, int> support_map;
 
 string toString(long id) {
   if(reverse_id_map.count(id)) {
@@ -69,18 +73,21 @@ vector<string> split(const string &s, char delim) {
   return elems;
 }
 
+// get string between single quotes - eg. 'se465' => se465
 void extractQuotes(string& s) {
   size_t first = s.find_first_of('\'');
   size_t last = s.find_last_of('\'');
   s = s.substr(first+1, last-first-1);
 }
 
+// calculate support for each method in a scope
 void calculateSupport(set<long> scope) {
   for(set<long>::iterator it = scope.begin();it!=scope.end();++it) {
     supportTable[*it]++;
   }
 }
 
+// calculate suport for each pair in a scope
 void calculatePairSupport(set<long> scope) {
   for(set<long>::iterator i = scope.begin();i!=scope.end();++i) {
     long first = *i;
@@ -99,14 +106,12 @@ void calculatePairSupport(set<long> scope) {
   }
 }
 
+// print bug in format specified in the assignment
 void printBug(int existing, int scope, pair<long,long> p, int support, double confidence) {
-  /*cout << "bug: " << toString(existing)
-    <<" in " << toString(scope)
-    << ", pair: " << "(" << toString(p.first) << ", " << toString(p.second) << "), "
-    << "support: " << support <<", "
-    << "confidence: " << confidence << endl;*/
     string first = toString(p.first);
     string second = toString(p.second);
+
+    // sort pair alphabetically for output
     if (first > second) {
       string temp = first;
       first = second;
@@ -122,6 +127,8 @@ void printBug(int existing, int scope, pair<long,long> p, int support, double co
         confidence*100);
 }
 
+// iterate though each scope, a bug occurs when "existing" is found in the scope
+// and "missing" is not found in the scope and the confidence is above a certain threshold
 void findBug(CallGraph & graph, long existing, long missing, double pairSupport, double bugConfidence, double confidence) {
   if(bugConfidence >= confidence) {
     for(CallGraph::iterator it  = graph.begin();it!=graph.end();++it) {
@@ -134,6 +141,7 @@ void findBug(CallGraph & graph, long existing, long missing, double pairSupport,
   }
 }
 
+// iterate through each pair, we further process pairs that has support above the threshold
 void findBugs(CallGraph & graph, int support, int confidence) {
   for(SupportPairTable::iterator it = supportPairTable.begin(); it!= supportPairTable.end(); ++it) {
     pair<long, long> p = it->first;
@@ -143,89 +151,58 @@ void findBugs(CallGraph & graph, int support, int confidence) {
       long second = p.second;
       int firstSupport = supportTable[first];
       int secondSupport = supportTable[second];
+      // calculate confidence for (pair, first_element) and (pair, second_element) and check for bugs
       findBug(graph, first, second, pairSupport, (double)pairSupport/firstSupport, (double)confidence/100);
       findBug(graph, second, first, pairSupport, (double)pairSupport/secondSupport, (double)confidence/100);
     }
   }
 }
-//we pass this into process graph
-set<long> expandGraph(CallGraph & graph, long curFunc){
-    long saveFunc=curFunc;
-    set <long> included;  //what we have so far
-    stack<long> toParse;  // functions to do
-    stack<long> levels;   //level of functions in toParse
-    int curLevel=0;
-    toParse.push(curFunc);
-    levels.push(0);
 
-    while(!toParse.empty()){
-      curLevel=levels.top();
-      levels.pop();
-      curFunc = toParse.top();
-      toParse.pop();
-      
-      included.insert(curFunc);
-      if(level==curLevel){
-        continue; 
-      } //exit if we reached our maximium level
-
-      set<long> curScope = graph[curFunc];  //get the graph from our newest function
-      curLevel++;
-      if(!curScope.empty()){        
-        included.erase(curFunc);      //eliminate the function if we can expand further
-      }
-      for(set<long>::iterator i = curScope.begin();i!=curScope.end();++i) {
-        levels.push(curLevel);  //push the functions for future expansion
-        toParse.push(*i);
-      }
-
-    }
-    included.erase(saveFunc);  //clean up the main function
-    return included;
-  
-
-}
 void processGraph(CallGraph & graph, int support, int confidence) {
-  CallGraph newgraph;
   for(CallGraph::iterator it = graph.begin(); it!=graph.end(); ++it) {
-    set<long> expandedResult = expandGraph(graph,it->first);
-    newgraph[it->first]=expandedResult;  //use the new results to calculate support and pairs
-    calculateSupport(expandedResult); 
-    calculatePairSupport(expandedResult);
+    calculateSupport(it->second); 
+    calculatePairSupport(it->second);
   }
-  findBugs(newgraph, support, confidence); 
+  findBugs(graph, support, confidence); 
 }
 
 int main (int argc, char* argv[]) {
   int support = atoi(argv[1]);
   int confidence = atoi(argv[2]);
-  level = atoi(argv[3]);
 
   string line;
   CallGraph callGraph;
   string node = "";
-
-  while (getline(cin, line)) { // string parsing
+  
+  // parse callGraph text output
+  while (getline(cin, line)) {
     if(line == "") {
       continue;
     }
     trim(line);
     vector<string> tokens = split(line, ' ');
+    // this is a SCOPE
     if (tokens.size() == 7) {
       node = tokens[5];
       extractQuotes(node);
+    // this is a METHOD in the above scope
     } else if (tokens.size() == 4) {
+
+        // ignore external nodes
         if(tokens[2] == "external" && tokens[3] == "node") {
           continue;
         }
+        // ignore root scope
         if (tokens[1] == "Root") {
           continue;
         }
+        // ignore root scope's methods
         if (node == "") {
           continue;
         }
         string leaf = tokens[3];
         extractQuotes(leaf);
+        // make hashTable representation of callGraph: scope => {methods in scope}
         callGraph[toId(node)].insert(toId(leaf));
     }
   }

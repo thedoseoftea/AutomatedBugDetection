@@ -1,0 +1,8 @@
+#!/bin/bash
+# use predefined variables to access passed arguments
+#echo arguments to the shell
+if [ "$#" -eq 1 ]; then
+    opt -print-callgraph  $1 2>&1 >/dev/null |../pipairC++ 3 65
+    exit 0
+fi
+opt -print-callgraph  $1 2>&1 >/dev/null |../pipairC++ $2 $3
